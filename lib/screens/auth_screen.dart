@@ -11,10 +11,9 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  bool _isLogin = true;
+  bool _isSignUp = false;
   final _formKey = GlobalKey<FormState>();
   
-  final _walletAddressController = TextEditingController();
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _bioController = TextEditingController();
@@ -22,7 +21,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
-    _walletAddressController.dispose();
     _nameController.dispose();
     _ageController.dispose();
     _bioController.dispose();
@@ -43,32 +41,43 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  void _submitForm() async {
+  void _connectWallet() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.connectWalletAndLogin();
+    
+    if (success && mounted) {
+      if (_isSignUp) {
+        // Show the sign-up form
+        setState(() {});
+      } else {
+        // Login successful, navigation will be handled by FutureBuilder in main.dart
+      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.error ?? 'Failed to connect wallet')),
+      );
+    }
+  }
+
+  void _submitSignUpForm() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    bool success;
-
-    if (_isLogin) {
-      success = await authProvider.login(_walletAddressController.text);
-    } else {
-      if (_selectedDate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select your date of birth')),
-        );
-        return;
-      }
-
-      success = await authProvider.signUp(
-        _walletAddressController.text,
-        _nameController.text,
-        int.parse(_ageController.text),
-        _selectedDate!,
-        _bioController.text,
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your date of birth')),
       );
+      return;
     }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.signUp(
+      _nameController.text,
+      int.parse(_ageController.text),
+      _selectedDate!,
+      _bioController.text,
+    );
 
     if (success && mounted) {
       // Navigation will be handled by the FutureBuilder in main.dart
@@ -82,6 +91,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final isWalletConnected = authProvider.isWalletConnected;
     
     return Scaffold(
       body: SafeArea(
@@ -108,34 +118,53 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isLogin ? 'Welcome Back!' : 'Create Your Account',
+                  _isSignUp ? 'Create Your Account' : 'Welcome Back!',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 32),
                 
-                // Form
-                Form(
-                  key: _formKey,
-                  child: Column(
+                if (!isWalletConnected) ...[
+                  // Wallet connection section
+                  const Text(
+                    'Connect your Solana wallet to continue',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 24),
+                  AuthButton(
+                    text: 'Connect Wallet',
+                    isLoading: authProvider.isLoading,
+                    onPressed: _connectWallet,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      TextFormField(
-                        controller: _walletAddressController,
-                        decoration: const InputDecoration(
-                          labelText: 'Solana Wallet Address',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.account_balance_wallet),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your wallet address';
-                          }
-                          return null;
+                      const Text("Don't have a wallet?"),
+                      TextButton(
+                        onPressed: () {
+                          // Open link to wallet installation guide
                         },
+                        child: const Text('Get one here'),
                       ),
-                      const SizedBox(height: 16),
-                      
-                      if (!_isLogin) ...[
+                    ],
+                  ),
+                ] else if (_isSignUp && isWalletConnected) ...[
+                  // Sign-up form (only shown after wallet connection)
+                  Text(
+                    'Connected Wallet: ${authProvider.walletAddress?.substring(0, 6)}...${authProvider.walletAddress?.substring(authProvider.walletAddress!.length - 4)}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
                         TextFormField(
                           controller: _nameController,
                           decoration: const InputDecoration(
@@ -205,34 +234,34 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
-                      ],
-                      
-                      // Submit Button
-                      AuthButton(
-                        text: _isLogin ? 'Login' : 'Sign Up',
-                        isLoading: authProvider.isLoading,
-                        onPressed: _submitForm,
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Toggle between Login and Sign Up
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _isLogin = !_isLogin;
-                          });
-                        },
-                        child: Text(
-                          _isLogin
-                              ? 'Don\'t have an account? Sign Up'
-                              : 'Already have an account? Login',
+                        const SizedBox(height: 24),
+                        
+                        AuthButton(
+                          text: 'Complete Sign Up',
+                          isLoading: authProvider.isLoading,
+                          onPressed: _submitSignUpForm,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
+                
+                const SizedBox(height: 24),
+                
+                // Toggle between Login and Sign Up
+                if (!authProvider.isLoading)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _isSignUp = !_isSignUp;
+                      });
+                    },
+                    child: Text(
+                      _isSignUp
+                          ? 'Already have an account? Login'
+                          : 'New user? Create an account',
+                    ),
+                  ),
               ],
             ),
           ),

@@ -38,6 +38,9 @@ dependencies:
   http: ^1.1.0
   flutter_secure_storage: ^8.0.0
   intl: ^0.18.1
+  solana: ^0.31.0+1
+  solana_wallet_adapter: ^0.1.5
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
