@@ -1,5 +1,5 @@
 class ApiConfig {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = 'https://621d-223-185-12-248.ngrok-free.app/api';
   
   // Auth endpoints
   static const String getNonce = '/auth/nonce';
