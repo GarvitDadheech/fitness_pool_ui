@@ -141,19 +141,30 @@ class AuthService {
 
   // Get user profile
   Future<User> getUserProfile(String token) async {
-    final response = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}${ApiConfig.userProfile}'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return User.fromJson(data['user']);
-    } else {
-      throw Exception('Failed to get user profile: ${response.body}');
+    debugPrint("Getting user profile with token: $token");
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.userProfile}'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['user'] != null) {
+          return User.fromJson(data['user']);
+        } else {
+          throw Exception('User data not found in response');
+        }
+      } else {
+        throw Exception('Failed to get user profile: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint("Error getting user profile: $e");
+      rethrow;
     }
   }
 } 

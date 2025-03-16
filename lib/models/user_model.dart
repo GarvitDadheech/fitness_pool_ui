@@ -23,7 +23,7 @@ class User {
       walletAddress: json['walletAddress'],
       name: json['name'],
       gender: json['gender'] ?? 'Male',
-      dateOfBirth: DateTime.parse(json['dateOfBirth']),
+      dateOfBirth: DateTime.parse(json['dob'] ?? json['dateOfBirth']),
       bio: json['bio'],
       isFitbitConnected: json['isFitbitConnected'] ?? false,
     );
