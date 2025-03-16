@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'screens/auth_screen.dart';
+import 'screens/landing_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/profile_form_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'services/storage_service.dart';
+
+// Global navigator key for navigation from anywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize storage service
   final storageService = StorageService();
   await storageService.init();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -31,6 +35,7 @@ class FitnessApp extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
     
     return MaterialApp(
+      navigatorKey: navigatorKey, // Use the global navigator key
       title: 'Fitness Solana',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -49,6 +54,11 @@ class FitnessApp extends StatelessWidget {
         fontFamily: 'Poppins',
       ),
       themeMode: ThemeMode.system,
+      // Define named routes
+      routes: {
+        '/home': (context) => const HomeScreen(),
+        '/profile_form': (context) => const ProfileFormScreen(),
+      },
       home: FutureBuilder<bool>(
         future: authProvider.isAuthenticated(),
         builder: (context, snapshot) {
@@ -64,7 +74,7 @@ class FitnessApp extends StatelessWidget {
           if (isAuthenticated) {
             return const HomeScreen();
           } else {
-            return const AuthScreen();
+            return const LandingScreen();
           }
         },
       ),

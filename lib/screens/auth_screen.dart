@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_button.dart';
 
@@ -11,18 +12,16 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  bool _isSignUp = false;
   final _formKey = GlobalKey<FormState>();
   
   final _nameController = TextEditingController();
-  final _ageController = TextEditingController();
   final _bioController = TextEditingController();
+  String _selectedGender = 'Male';
   DateTime? _selectedDate;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _ageController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -30,7 +29,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
+      initialDate: _selectedDate ?? DateTime.now().subtract(const Duration(days: 365 * 18)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
@@ -43,23 +42,41 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void _connectWallet() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.connectWalletAndLogin();
+    final success = await authProvider.connectWallet();
     
-    if (success && mounted) {
-      if (_isSignUp) {
-        // Show the sign-up form
-        setState(() {});
-      } else {
-        // Login successful, navigation will be handled by FutureBuilder in main.dart
-      }
-    } else if (mounted) {
+    if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.error ?? 'Failed to connect wallet')),
+        SnackBar(
+          content: Text(authProvider.error ?? 'Failed to connect wallet'),
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
 
-  void _submitSignUpForm() async {
+  void _verifyWallet() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // First get the nonce
+    final nonceSuccess = await authProvider.getNonce();
+    
+    if (!nonceSuccess && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.error ?? 'Failed to get nonce'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    
+    // Then submit the form which will handle the signing and registration
+    if (mounted) {
+      _submitForm();
+    }
+  }
+
+  void _submitForm() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -72,18 +89,54 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.signUp(
-      _nameController.text,
-      int.parse(_ageController.text),
-      _selectedDate!,
-      _bioController.text,
+    
+    final success = await authProvider.createProfile(
+      name: _nameController.text,
+      gender: _selectedGender,
+      dateOfBirth: _selectedDate!,
+      bio: _bioController.text,
     );
 
-    if (success && mounted) {
-      // Navigation will be handled by the FutureBuilder in main.dart
-    } else if (mounted) {
+    if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.error ?? 'An error occurred')),
+      );
+    }
+  }
+
+  void _disconnectWallet() async {
+    // Show confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Change Wallet'),
+          content: const Text('Do you want to disconnect the current wallet and connect a different one?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Disconnect'),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (confirm != true) return;
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.disconnectWallet();
+    
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.error ?? 'Failed to disconnect wallet'),
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -118,150 +171,159 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isSignUp ? 'Create Your Account' : 'Welcome Back!',
+                  'Create Your Account',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 32),
                 
-                if (!isWalletConnected) ...[
-                  // Wallet connection section
-                  const Text(
-                    'Connect your Solana wallet to continue',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 24),
-                  AuthButton(
-                    text: 'Connect Wallet',
-                    isLoading: authProvider.isLoading,
-                    onPressed: _connectWallet,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                // Registration Form
+                Form(
+                  key: _formKey,
+                  child: Column(
                     children: [
-                      const Text("Don't have a wallet?"),
-                      TextButton(
-                        onPressed: () {
-                          // Open link to wallet installation guide
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your name';
+                          }
+                          return null;
                         },
-                        child: const Text('Get one here'),
                       ),
-                    ],
-                  ),
-                ] else if (_isSignUp && isWalletConnected) ...[
-                  // Sign-up form (only shown after wallet connection)
-                  Text(
-                    'Connected Wallet: ${authProvider.walletAddress?.substring(0, 6)}...${authProvider.walletAddress?.substring(authProvider.walletAddress!.length - 4)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Full Name',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.person),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your name';
-                            }
-                            return null;
-                          },
+                      const SizedBox(height: 16),
+                      
+                      // Gender Selection
+                      DropdownButtonFormField<String>(
+                        value: _selectedGender,
+                        decoration: const InputDecoration(
+                          labelText: 'Gender',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.people),
                         ),
-                        const SizedBox(height: 16),
-                        
-                        TextFormField(
-                          controller: _ageController,
+                        items: ['Male', 'Female', 'Other'].map((gender) {
+                          return DropdownMenuItem(
+                            value: gender,
+                            child: Text(gender),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedGender = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Date of Birth Picker
+                      InkWell(
+                        onTap: () => _selectDate(context),
+                        child: InputDecorator(
                           decoration: const InputDecoration(
-                            labelText: 'Age',
+                            labelText: 'Date of Birth',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
+                            prefixIcon: Icon(Icons.cake),
                           ),
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your age';
-                            }
-                            if (int.tryParse(value) == null) {
-                              return 'Please enter a valid number';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Date of Birth Picker
-                        InkWell(
-                          onTap: () => _selectDate(context),
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Date of Birth',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.cake),
-                            ),
-                            child: Text(
-                              _selectedDate == null
-                                  ? 'Select Date'
-                                  : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                            ),
+                          child: Text(
+                            _selectedDate == null
+                                ? 'Select Date'
+                                : DateFormat('MMM dd, yyyy').format(_selectedDate!),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        
-                        TextFormField(
-                          controller: _bioController,
-                          decoration: const InputDecoration(
-                            labelText: 'Bio',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.description),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      TextFormField(
+                        controller: _bioController,
+                        decoration: const InputDecoration(
+                          labelText: 'Bio',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.description),
+                        ),
+                        maxLines: 3,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a short bio';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Wallet Connection Status
+                      if (isWalletConnected) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green),
                           ),
-                          maxLines: 3,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a short bio';
-                            }
-                            return null;
-                          },
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Wallet Connected',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${authProvider.walletAddress?.substring(0, 6)}...${authProvider.walletAddress?.substring(authProvider.walletAddress!.length - 4)}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.swap_horiz, color: Colors.blue),
+                                label: const Text('Change', style: TextStyle(color: Colors.blue)),
+                                onPressed: _disconnectWallet,
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 24),
                         
+                        // Verify Wallet Button
                         AuthButton(
-                          text: 'Complete Sign Up',
+                          text: 'Verify Wallet & Submit',
                           isLoading: authProvider.isLoading,
-                          onPressed: _submitSignUpForm,
+                          onPressed: _verifyWallet,
+                        ),
+                      ] else ...[
+                        // Connect Wallet Button
+                        AuthButton(
+                          text: 'Connect Wallet',
+                          isLoading: authProvider.isLoading,
+                          onPressed: _connectWallet,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'You must connect your wallet to continue',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                ],
-                
-                const SizedBox(height: 24),
-                
-                // Toggle between Login and Sign Up
-                if (!authProvider.isLoading)
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _isSignUp = !_isSignUp;
-                      });
-                    },
-                    child: Text(
-                      _isSignUp
-                          ? 'Already have an account? Login'
-                          : 'New user? Create an account',
-                    ),
-                  ),
+                ),
               ],
             ),
           ),

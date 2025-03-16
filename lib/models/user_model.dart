@@ -2,7 +2,7 @@ class User {
   final String id;
   final String walletAddress;
   final String name;
-  final int age;
+  final String gender;
   final DateTime dateOfBirth;
   final String bio;
   final bool isFitbitConnected;
@@ -11,7 +11,7 @@ class User {
     required this.id,
     required this.walletAddress,
     required this.name,
-    required this.age,
+    required this.gender,
     required this.dateOfBirth,
     required this.bio,
     this.isFitbitConnected = false,
@@ -22,7 +22,7 @@ class User {
       id: json['id'],
       walletAddress: json['walletAddress'],
       name: json['name'],
-      age: json['age'],
+      gender: json['gender'] ?? 'Male',
       dateOfBirth: DateTime.parse(json['dateOfBirth']),
       bio: json['bio'],
       isFitbitConnected: json['isFitbitConnected'] ?? false,
@@ -34,7 +34,7 @@ class User {
       'id': id,
       'walletAddress': walletAddress,
       'name': name,
-      'age': age,
+      'gender': gender,
       'dateOfBirth': dateOfBirth.toIso8601String(),
       'bio': bio,
       'isFitbitConnected': isFitbitConnected,

@@ -39,4 +39,8 @@ class StorageService {
   Future<String?> getWalletAddress() async {
     return _prefs.getString('wallet_address');
   }
+  
+  Future<void> deleteWalletAddress() async {
+    await _prefs.remove('wallet_address');
+  }
 } 

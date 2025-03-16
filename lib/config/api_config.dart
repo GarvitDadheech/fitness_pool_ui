@@ -1,11 +1,11 @@
 class ApiConfig {
-  static const String baseUrl = 'https://621d-223-185-12-248.ngrok-free.app/api';
+  static const String baseUrl = 'https://ba22-223-185-19-51.ngrok-free.app/api';
   
   // Auth endpoints
   static const String getNonce = '/auth/nonce';
-  static const String walletLogin = '/auth/wallet-login';
+  static const String verifyNonce = '/auth/verify-nonce';
+  static const String createProfile = '/auth/profile';
   
   // User endpoints
   static const String userProfile = '/user/profile';
-  static const String updateProfile = '/user/profile';
 } 

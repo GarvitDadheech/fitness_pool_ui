@@ -39,7 +39,7 @@ class UserProvider with ChangeNotifier {
         id: _user!.id,
         walletAddress: _user!.walletAddress,
         name: _user!.name,
-        age: _user!.age,
+        gender: _user!.gender,
         dateOfBirth: _user!.dateOfBirth,
         bio: _user!.bio,
         isFitbitConnected: true,
