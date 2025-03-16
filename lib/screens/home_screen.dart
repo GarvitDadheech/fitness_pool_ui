@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    
+    debugPrint("Token: ${authProvider.token}");
     if (authProvider.token != null) {
       await userProvider.fetchUserProfile(authProvider.token!);
     }
